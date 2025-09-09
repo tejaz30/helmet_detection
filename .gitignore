@@ -1,0 +1,57 @@
+
+# Python
+
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.env
+.venv
+venv/
+ENV/
+
+
+# IDE / Editor
+
+.vscode/
+.idea/
+*.swp
+*.swo
+
+
+# Checkpoints / Weights
+
+checkpoints/
+*.pth
+*.pt
+*.ckpt
+
+
+# Datasets
+
+data/
+datasets/
+*.zip
+*.tar
+*.tar.gz
+
+
+# Logs / Outputs
+
+runs/
+logs/
+wandb/
+*.log
+inference_result.jpg
+inference_results/
+
+
+# OS Files
+
+.DS_Store
+Thumbs.db

@@ -5,11 +5,10 @@ import numpy as np
 from typing import List, Tuple, Dict, Optional
 
 
-# -------------------------------
-# 🔹 1. Basic Conv Block
+
+# Basic Conv Block
 # Convolution -> BatchNorm -> LeakyReLU
-# This is the most common pattern in YOLOv3
-# -------------------------------
+
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=None):
         super().__init__()
@@ -26,12 +25,9 @@ class ConvBlock(nn.Module):
         return self.activation(self.bn(self.conv(x)))
 
 
-# -------------------------------
-# 🔹 2. Residual Block
-# This is the ResNet trick:
-# output = input + F(input)
-# Helps deep networks train better
-# -------------------------------
+#Residual Block
+# This is the ResNet core concept of learning used here:
+# output = input + F(input) 
 class ResidualBlock(nn.Module):
     def __init__(self, channels, num_blocks=1):
         super().__init__()
@@ -52,10 +48,9 @@ class ResidualBlock(nn.Module):
         return x
 
 
-# -------------------------------
-# 🔹 3. Darknet-53 Backbone
+
+# Darknet-53 Backbone
 # Extracts features at multiple scales
-# -------------------------------
 class Darknet53(nn.Module):
     def __init__(self):
         super().__init__()
@@ -85,10 +80,10 @@ class Darknet53(nn.Module):
         return route_1, route_2, route_3
 
 
-# -------------------------------
-# 🔹 4. Detection Head
-# Converts feature maps -> predictions
-# -------------------------------
+
+# Detection Head
+# Converts feature maps into predictions
+
 class YOLOv3DetectionHead(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
@@ -105,10 +100,10 @@ class YOLOv3DetectionHead(nn.Module):
         return self.layers(x)
 
 
-# -------------------------------
-# 🔹 5. Full YOLOv3 Model
+
+#  Full YOLOv3 Model
 # Backbone + FPN + Detection Heads
-# -------------------------------
+
 class YOLOv3(nn.Module):
     def __init__(self, num_classes=80):
         super().__init__()
@@ -154,47 +149,47 @@ class YOLOv3(nn.Module):
         return out1, out2, out3
 
 
-# -------------------------------
-# 🔹 6. Decode Predictions
-# Converts raw predictions -> usable boxes
-# -------------------------------
-def decode_predictions(pred, anchors, num_classes, input_dim):
+
+
+# Converts raw predictions into visual boxes
+
+import torch
+
+def decode_predictions(pred, num_classes, input_dim):
     """
-    pred: raw output from one scale [B, A*(5+C), H, W]
-    anchors: list of anchor boxes for this scale
+    Anchor-free decoding of YOLO predictions
+    pred: raw output [B, (5+C), H, W]
     input_dim: size of input image (e.g. 416x416)
     """
     batch_size, _, grid_size, _ = pred.shape
     stride = input_dim // grid_size
-    num_anchors = len(anchors)
 
-    # Reshape: [B, A, (5+C), H, W]
-    pred = pred.view(batch_size, num_anchors, 5 + num_classes, grid_size, grid_size)
-    pred = pred.permute(0, 1, 3, 4, 2).contiguous()
+    # Reshape: [B, H, W, 5+C]
+    pred = pred.view(batch_size, (5 + num_classes), grid_size, grid_size)
+    pred = pred.permute(0, 2, 3, 1).contiguous()  # [B, H, W, 5+C]
 
-    # Sigmoid center coords & objectness
-    pred[..., 0:2] = torch.sigmoid(pred[..., 0:2])  # x,y
+    # Sigmoid center coords & objectness & classes
+    pred[..., 0:2] = torch.sigmoid(pred[..., 0:2])  # x, y
     pred[..., 4:] = torch.sigmoid(pred[..., 4:])    # obj + classes
 
-    # Width/Height (exp on anchors)
-    pred[..., 2:4] = torch.exp(pred[..., 2:4]) * torch.tensor(anchors, device=pred.device)
+    # Width/Height — now learned directly, not relative to anchors
+    pred[..., 2:4] = torch.exp(pred[..., 2:4])
 
     # Grid offsets
-    grid_x = torch.arange(grid_size).repeat(grid_size, 1).view([1, 1, grid_size, grid_size]).float()
-    grid_y = torch.arange(grid_size).repeat(grid_size, 1).t().view([1, 1, grid_size, grid_size]).float()
+    grid_x = torch.arange(grid_size).repeat(grid_size, 1).view([1, grid_size, grid_size, 1]).float()
+    grid_y = torch.arange(grid_size).repeat(grid_size, 1).t().view([1, grid_size, grid_size, 1]).float()
     pred[..., 0] += grid_x.to(pred.device)
     pred[..., 1] += grid_y.to(pred.device)
 
     # Scale to input image size
     pred[..., :4] *= stride
+
     return pred.view(batch_size, -1, 5 + num_classes)
 
 
-# -------------------------------
-# 🔹 7. Test the Model
-# -------------------------------
+#sample testing
 if __name__ == "__main__":
-    model = YOLOv3(num_classes=3)  # Example: 3 classes (helmet, person, no-helmet)
+    model = YOLOv3(num_classes=2)  
     x = torch.randn(2, 3, 416, 416)  # 2 fake images
 
     out1, out2, out3 = model(x)

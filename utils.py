@@ -1,10 +1,10 @@
 import torch
+import torchvision
 import cv2
 import numpy as np
 
-# -------------------------------
-# 🔹 Non-Maximum Suppression (NMS)
-# -------------------------------
+# Non-Maximum Suppression 
+
 def non_max_suppression(predictions, conf_thresh=0.5, iou_thresh=0.4):
     """
     predictions: [N, 5+C] → (x, y, w, h, obj, class_probs)
@@ -45,9 +45,9 @@ def non_max_suppression(predictions, conf_thresh=0.5, iou_thresh=0.4):
     return detections
 
 
-# -------------------------------
-# 🔹 Visualization with OpenCV
-# -------------------------------
+
+# Visualization using OpenCV
+
 def draw_detections(image, detections, class_names):
     for (x1, y1, x2, y2, score, class_id) in detections:
         color = (0, 255, 0) if class_id == 0 else (0, 0, 255)  # helmet vs no-helmet
@@ -58,52 +58,3 @@ def draw_detections(image, detections, class_names):
     return image
 
 
-# -------------------------------
-# 🔹 Example Inference Script
-# -------------------------------
-if __name__ == "__main__":
-    from yolov3 import YOLOv3, decode_predictions  # make sure your model file is imported
-    import torchvision
-
-    # 1. Load model
-    num_classes = 3  # helmet, no-helmet, person
-    model = YOLOv3(num_classes=num_classes)
-    model.eval()
-
-    # 2. Load image
-    img_path = "test.jpg"
-    image = cv2.imread(img_path)
-    input_dim = 416
-    img_resized = cv2.resize(image, (input_dim, input_dim))
-    img_tensor = torch.from_numpy(img_resized[..., ::-1].transpose(2, 0, 1)).float()
-    img_tensor = img_tensor.unsqueeze(0) / 255.0  # [1,3,416,416]
-
-    # 3. Forward pass
-    out1, out2, out3 = model(img_tensor)
-
-    # Anchors for YOLOv3 (predefined, 9 total → 3 per scale)
-    anchors = [
-        [(116, 90), (156, 198), (373, 326)],  # scale 1 (13x13)
-        [(30, 61), (62, 45), (59, 119)],      # scale 2 (26x26)
-        [(10, 13), (16, 30), (33, 23)]        # scale 3 (52x52)
-    ]
-
-    # 4. Decode predictions
-    boxes1 = decode_predictions(out1, anchors[0], num_classes, input_dim)
-    boxes2 = decode_predictions(out2, anchors[1], num_classes, input_dim)
-    boxes3 = decode_predictions(out3, anchors[2], num_classes, input_dim)
-
-    all_boxes = torch.cat([boxes1, boxes2, boxes3], dim=1).squeeze(0)  # [N, 5+C]
-
-    # 5. Apply NMS
-    detections = non_max_suppression(all_boxes, conf_thresh=0.5, iou_thresh=0.4)
-
-    # 6. Draw detections
-    class_names = ["helmet", "no-helmet", "person"]
-    image_with_boxes = draw_detections(image.copy(), detections, class_names)
-
-    # 7. Save or display result
-    cv2.imshow("Detections", image_with_boxes)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-    cv2.imwrite("output.jpg", image_with_boxes)
